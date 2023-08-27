@@ -41,6 +41,17 @@ def addList(video, server_url):
             'thumb': thumbnail_url
         })
 
+    setVideoInfo(li, video)
+
+    li.addContextMenuItems([
+        ('更新', 'Container.Refresh'),
+        ('削除', 'RunScript(%s/delete.py, %d, %s)' % (settings.getAddonInfo('path'), video['id'], video['name']))
+    ])
+
+    video_url = urljoin(server_url, 'api/videos/' + str(video['videoFiles'][0]['id']))
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=video_url, listitem=li)
+
+def setVideoInfo(li, video):
     startdate = datetime.datetime.fromtimestamp(video['startAt'] / 1000)
 
     info = {
@@ -78,13 +89,10 @@ def addList(video, server_url):
 
     li.setInfo('video', info)
 
-    li.addContextMenuItems([
-        ('更新', 'Container.Refresh'),
-        ('削除', 'RunScript(%s/delete.py, %d, %s)' % (settings.getAddonInfo('path'), video['id'], video['name']))
-    ])
-
-    video_url = urljoin(server_url, 'api/videos/' + str(video['videoFiles'][0]['id']))
-
+def addRecordingList(video, server_url):
+    li = xbmcgui.ListItem(video['name'])
+    setVideoInfo(li, video)
+    video_url = urljoin(server_url, 'api/streams/recorded/' + str(video['videoFiles'][0]['id']) +'/mp4?ss=0&mode=0')
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=video_url, listitem=li)
 
 def getServerUrl():
@@ -174,6 +182,18 @@ def listItems(rule=None, genre=None, keyword=None):
     else:
         makeList(videos)
 
+def listRecording():
+    videos = getRecordingList(getServerUrl(), recLen=2000)
+    makeStreamList(videos)
+
+def makeStreamList(videos):
+    server_url = settings.getSetting('server_url')
+    for video in videos:
+        addRecordingList(video, server_url)
+    xbmcplugin.addSortMethod(addon_handle, xbmcplugin.SORT_METHOD_DATEADDED)
+    xbmcplugin.setContent(addon_handle, 'movies')
+    xbmcplugin.endOfDirectory(addon_handle)
+
 def makeList(videos):
     server_url = settings.getSetting('server_url')
     for video in videos:
@@ -195,15 +215,21 @@ def listMain():
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url,
                                 listitem=li, isFolder=True)
 
-    li = xbmcgui.ListItem('ジャンル')
+    li = xbmcgui.ListItem('録画中')
     #li.setIsFolder(True)
-    url = '{0}?list=Genre'.format(pluginUrl)
+    url = '{0}?list=Recording'.format(pluginUrl)
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url,
                                 listitem=li, isFolder=True)
 
     li = xbmcgui.ListItem('ルール')
     #li.setIsFolder(True)
     url = '{0}?list=Rule'.format(pluginUrl)
+    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url,
+                                listitem=li, isFolder=True)
+
+    li = xbmcgui.ListItem('ジャンル')
+    #li.setIsFolder(True)
+    url = '{0}?list=Genre'.format(pluginUrl)
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url,
                                 listitem=li, isFolder=True)
 
@@ -220,6 +246,8 @@ def menulist(paramstring):
     if params:
         if params['list'][0] == 'Recorded':
             recordedAll()
+        elif params['list'][0] == 'Recording':
+            listRecording()
         elif params['list'][0] == 'Rule':
             id = params.get('id', None)
             if id:
